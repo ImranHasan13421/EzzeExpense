@@ -36,7 +36,7 @@ final List<Map<String, dynamic>> kDefaultCategories = [
   {'name': 'Shopping', 'icon': '🛍️', 'color': 0xFF8E24AA},
   {'name': 'Bills', 'icon': '💡', 'color': 0xFFFB8C00},
   {'name': 'Health', 'icon': '💊', 'color': 0xFF00ACC1},
-  {'name': 'Entertainment', 'icon': '🎬', 'color': 0xFF43A047},
+  {'name': 'House Rent', 'icon': '🏠', 'color': 0xFF43A047},
   {'name': 'Education', 'icon': '📚', 'color': 0xFF6D4C41},
   {'name': 'Other', 'icon': '📦', 'color': 0xFF757575},
 ];
@@ -89,6 +89,8 @@ class ExpenseModel {
   String categoryId;
   DateTime date;
   String notes;
+  /// Stores subcategory for Bills/Other, or person name for Friendly Loan
+  String subCategory;
 
   ExpenseModel({
     required this.id,
@@ -97,6 +99,7 @@ class ExpenseModel {
     required this.categoryId,
     required this.date,
     this.notes = '',
+    this.subCategory = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -106,6 +109,7 @@ class ExpenseModel {
     'categoryId': categoryId,
     'date': date.toIso8601String(),
     'notes': notes,
+    'subCategory': subCategory,
   };
 
   factory ExpenseModel.fromMap(Map<dynamic, dynamic> map) => ExpenseModel(
@@ -115,6 +119,7 @@ class ExpenseModel {
     categoryId: map['categoryId'] ?? '',
     date: DateTime.tryParse(map['date'] ?? '') ?? DateTime.now(),
     notes: map['notes'] ?? '',
+    subCategory: map['subCategory'] ?? '',
   );
 }
 
@@ -179,6 +184,18 @@ class BudgetModel {
 // ============================================================
 // SECTION 3: PROVIDERS
 // ============================================================
+
+// Special category names — matched by name at runtime
+const String kCatFriendlyLoan = 'Friendly Loan';
+const String kCatBills        = 'Bills';
+const String kCatOther        = 'Other';
+
+const List<String> kBillsSubCategories = [
+  'Electricity', 'Gas', 'Wifi', 'Trash', 'Cook', 'Extra',
+];
+const List<String> kOtherSubCategories = [
+  'House Rent', 'Personal Care', 'Gift', 'Miscellaneous',
+];
 
 class SettingsProvider extends ChangeNotifier {
   late Box _box;
@@ -417,8 +434,11 @@ class BudgetProvider extends ChangeNotifier {
   Future<void> init() async {
     _box = Hive.box(kBudgetBox);
     final raw = _box.get('budget');
-    if (raw != null) _budget = BudgetModel.fromMap(raw);
+    if (raw != null) {
+      _budget = BudgetModel.fromMap(raw);
+    }
   }
+
 
   Future<void> setMonthlyBudget(double amount) async {
     _budget.monthlyTotal = amount;
@@ -564,38 +584,43 @@ class SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const Spacer(),
-              ],
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 16),
             ),
-            const SizedBox(height: 12),
-            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
-            const SizedBox(height: 4),
-            Text(amount,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                amount,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                )),
+                  fontSize: 15,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
 class ExpenseTile extends StatelessWidget {
   final ExpenseModel expense;
   final VoidCallback onEdit;
@@ -652,7 +677,7 @@ class ExpenseTile extends StatelessWidget {
           ),
           title: Text(expense.title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(
-            '${cat?.name ?? 'Unknown'} • ${_formatDate(expense.date)}',
+            _buildSubtitle(cat, expense),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           trailing: Text(
@@ -667,6 +692,14 @@ class ExpenseTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _buildSubtitle(CategoryModel? cat, ExpenseModel e) {
+    final catName = cat?.name ?? 'Unknown';
+    final date    = _formatDate(e.date);
+    if (e.subCategory.isEmpty) return '$catName • $date';
+    if (catName == kCatFriendlyLoan) return '$catName • 🤝 ${e.subCategory} • $date';
+    return '$catName • ${e.subCategory} • $date';
   }
 
   Future<bool?> _confirmDelete(BuildContext context) {
@@ -781,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 80, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(8, 80, 8, 8),
                   child: Row(
                     children: [
                       Expanded(
@@ -955,20 +988,29 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
   late TextEditingController _titleCtrl;
   late TextEditingController _amountCtrl;
   late TextEditingController _notesCtrl;
+  late TextEditingController _loanPersonCtrl;
   late DateTime _selectedDate;
-  String _selectedCategoryId = '';
+  String _selectedCategoryId  = '';
+  String _selectedSubCategory = '';
 
   bool get isEdit => widget.expense != null;
+
+  String _selectedCatName(List<CategoryModel> cats) {
+    try { return cats.firstWhere((c) => c.id == _selectedCategoryId).name; }
+    catch (_) { return ''; }
+  }
 
   @override
   void initState() {
     super.initState();
     final e = widget.expense;
-    _titleCtrl = TextEditingController(text: e?.title ?? '');
-    _amountCtrl = TextEditingController(text: e != null ? e.amount.toStringAsFixed(0) : '');
-    _notesCtrl = TextEditingController(text: e?.notes ?? '');
-    _selectedDate = e?.date ?? DateTime.now();
-    _selectedCategoryId = e?.categoryId ?? '';
+    _titleCtrl      = TextEditingController(text: e?.title ?? '');
+    _amountCtrl     = TextEditingController(text: e != null ? e.amount.toStringAsFixed(0) : '');
+    _notesCtrl      = TextEditingController(text: e?.notes ?? '');
+    _loanPersonCtrl = TextEditingController(text: e?.subCategory ?? '');
+    _selectedDate        = e?.date ?? DateTime.now();
+    _selectedCategoryId  = e?.categoryId ?? '';
+    _selectedSubCategory = e?.subCategory ?? '';
   }
 
   @override
@@ -985,13 +1027,18 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     _titleCtrl.dispose();
     _amountCtrl.dispose();
     _notesCtrl.dispose();
+    _loanPersonCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final categories = context.watch<CategoryProvider>().categories;
-    final settings = context.read<SettingsProvider>();
+    final settings   = context.read<SettingsProvider>();
+    final catName    = _selectedCatName(categories);
+    final isBills    = catName == kCatBills;
+    final isOther    = catName == kCatOther;
+    final isLoan     = catName == kCatFriendlyLoan;
 
     return Scaffold(
       appBar: AppBar(
@@ -1009,7 +1056,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Title
+            // ── Title ───────────────────────────────────────────────
             TextFormField(
               controller: _titleCtrl,
               decoration: const InputDecoration(
@@ -1021,7 +1068,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Amount
+            // ── Amount ──────────────────────────────────────────────
             TextFormField(
               controller: _amountCtrl,
               decoration: InputDecoration(
@@ -1040,7 +1087,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Category
+            // ── Category chips ──────────────────────────────────────
             Text('Category', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
             Wrap(
@@ -1050,7 +1097,11 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                 final selected = _selectedCategoryId == cat.id;
                 return ChoiceChip(
                   selected: selected,
-                  onSelected: (_) => setState(() => _selectedCategoryId = cat.id),
+                  onSelected: (_) => setState(() {
+                    _selectedCategoryId  = cat.id;
+                    _selectedSubCategory = '';
+                    _loanPersonCtrl.clear();
+                  }),
                   avatar: Text(cat.icon, style: const TextStyle(fontSize: 14)),
                   label: Text(cat.name),
                   selectedColor: cat.color.withOpacity(0.25),
@@ -1059,7 +1110,64 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Date picker
+            // ── Bills subcategory dropdown ──────────────────────────
+            if (isBills) ...[
+              Text('Bill Type', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: kBillsSubCategories.contains(_selectedSubCategory)
+                    ? _selectedSubCategory
+                    : kBillsSubCategories.first,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.receipt_outlined),
+                  labelText: 'Select bill type',
+                ),
+                items: kBillsSubCategories
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedSubCategory = v ?? ''),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Other subcategory dropdown ──────────────────────────
+            if (isOther) ...[
+              Text('Sub-Category', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: kOtherSubCategories.contains(_selectedSubCategory)
+                    ? _selectedSubCategory
+                    : kOtherSubCategories.first,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.folder_outlined),
+                  labelText: 'Select sub-category',
+                ),
+                items: kOtherSubCategories
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedSubCategory = v ?? ''),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Friendly Loan: person name ──────────────────────────
+            if (isLoan) ...[
+              TextFormField(
+                controller: _loanPersonCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Person Name',
+                  prefixIcon: Icon(Icons.person_outline),
+                  hintText: 'Who did you lend to?',
+                ),
+                textCapitalization: TextCapitalization.words,
+                validator: (v) => (isLoan && (v == null || v.trim().isEmpty))
+                    ? "Please enter the person's name"
+                    : null,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Date picker ─────────────────────────────────────────
             InkWell(
               onTap: _pickDate,
               borderRadius: BorderRadius.circular(12),
@@ -1073,7 +1181,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Notes
+            // ── Notes ───────────────────────────────────────────────
             TextFormField(
               controller: _notesCtrl,
               decoration: const InputDecoration(
@@ -1086,7 +1194,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Save button
+            // ── Save button ─────────────────────────────────────────
             FilledButton.icon(
               onPressed: _save,
               icon: Icon(isEdit ? Icons.save : Icons.add),
@@ -1121,6 +1229,12 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
       return;
     }
 
+    final cats    = context.read<CategoryProvider>().categories;
+    final catName = _selectedCatName(cats);
+    final subCat  = catName == kCatFriendlyLoan
+        ? _loanPersonCtrl.text.trim()
+        : _selectedSubCategory;
+
     final ep = context.read<ExpenseProvider>();
     final expense = ExpenseModel(
       id: widget.expense?.id ?? const Uuid().v4(),
@@ -1129,6 +1243,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
       categoryId: _selectedCategoryId,
       date: _selectedDate,
       notes: _notesCtrl.text.trim(),
+      subCategory: subCat,
     );
 
     if (isEdit) {
@@ -1136,7 +1251,6 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     } else {
       ep.addExpense(expense);
     }
-
     Navigator.pop(context);
   }
 
@@ -1393,7 +1507,7 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                     child: ListTile(
                       leading: Text(cat?.icon ?? '📦', style: const TextStyle(fontSize: 24)),
                       title: Text(e.title),
-                      subtitle: Text(_fmt(e.date)),
+                      subtitle: Text(_buildSearchSubtitle(cat, e)),
                       trailing: Text('${settings.currencySymbol} ${e.amount.toStringAsFixed(0)}',
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                       onTap: () {
@@ -1413,6 +1527,13 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
         ],
       ),
     );
+  }
+
+  String _buildSearchSubtitle(CategoryModel? cat, ExpenseModel e) {
+    final catName = cat?.name ?? 'Unknown';
+    if (e.subCategory.isEmpty) return '$catName • ${_fmt(e.date)}';
+    if (catName == kCatFriendlyLoan) return '$catName • 🤝 ${e.subCategory} • ${_fmt(e.date)}';
+    return '$catName • ${e.subCategory} • ${_fmt(e.date)}';
   }
 
   Widget _dateChip(String label, String value) {
@@ -1524,8 +1645,20 @@ class _AnalyticsTab extends StatelessWidget {
 
     String topCatName = '—';
     if (catTotals.isNotEmpty) {
-      final topId = catTotals.entries.reduce((a, b) => a.value > b.value ? a : b).key;
-      topCatName = categories.getById(topId)?.name ?? '—';
+      final topId  = catTotals.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+      final topCat = categories.getById(topId);
+      topCatName   = topCat?.name ?? '—';
+      if (topCat != null &&
+          (topCat.name == kCatBills || topCat.name == kCatOther)) {
+        final subCounts = <String, double>{};
+        for (final e in periodExpenses.where((e) => e.categoryId == topId && e.subCategory.isNotEmpty)) {
+          subCounts[e.subCategory] = (subCounts[e.subCategory] ?? 0) + e.amount;
+        }
+        if (subCounts.isNotEmpty) {
+          final topSub = subCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+          topCatName = '${topCat.name} • $topSub';
+        }
+      }
     }
 
     return ListView(
@@ -1905,38 +2038,73 @@ class _MonthlySummaryTabState extends State<_MonthlySummaryTab> {
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           ...catTotals.entries.map((entry) {
-            final cat = categories.getById(entry.key);
-            final pct = total > 0 ? entry.value / total : 0.0;
+            final cat    = categories.getById(entry.key);
+            final pct    = total > 0 ? entry.value / total : 0.0;
+            final isLoan = cat?.name == kCatFriendlyLoan;
+            final hasSub = cat?.name == kCatBills || cat?.name == kCatOther || isLoan;
+
+            // Per-person/sub breakdown
+            final subTotals = <String, double>{};
+            if (hasSub) {
+              for (final e in current.where(
+                      (e) => e.categoryId == entry.key && e.subCategory.isNotEmpty)) {
+                subTotals[e.subCategory] = (subTotals[e.subCategory] ?? 0) + e.amount;
+              }
+            }
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(cat?.icon ?? '📦', style: const TextStyle(fontSize: 22)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Row(
+                      children: [
+                        Text(cat?.icon ?? '📦', style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(cat?.name ?? '?', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              Text('$sym ${entry.value.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(cat?.name ?? '?', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  Text('$sym ${entry.value.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              LinearProgressIndicator(
+                                value: pct,
+                                backgroundColor: Colors.grey.withOpacity(0.2),
+                                color: cat != null ? Color(cat.colorValue) : Colors.blue,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(
-                            value: pct,
-                            backgroundColor: Colors.grey.withOpacity(0.2),
-                            color: cat != null ? Color(cat.colorValue) : Colors.blue,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                    if (subTotals.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      ...subTotals.entries.map((s) => Padding(
+                        padding: const EdgeInsets.only(left: 34, top: 2),
+                        child: Row(
+                          children: [
+                            Text(isLoan ? '🤝' : '›',
+                                style: TextStyle(fontSize: isLoan ? 13 : 16,
+                                    color: Colors.grey.shade500)),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(s.key,
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700))),
+                            Text('$sym ${s.value.toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      )),
+                    ],
                   ],
                 ),
               ),
@@ -2083,11 +2251,23 @@ class BudgetScreen extends StatelessWidget {
               final spent = catTotals[entry.key] ?? 0;
               final pct = entry.value > 0 ? spent / entry.value : 0.0;
 
+              final isLoanCat = cat?.name == kCatFriendlyLoan;
+              final hasSubCats = cat?.name == kCatBills ||
+                  cat?.name == kCatOther || isLoanCat;
+              final subTotals = <String, double>{};
+              if (hasSubCats) {
+                for (final e in expenses.thisMonthExpenses
+                    .where((e) => e.categoryId == entry.key && e.subCategory.isNotEmpty)) {
+                  subTotals[e.subCategory] = (subTotals[e.subCategory] ?? 0) + e.amount;
+                }
+              }
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -2126,6 +2306,24 @@ class BudgetScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (subTotals.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        ...subTotals.entries.map((s) => Padding(
+                          padding: const EdgeInsets.only(left: 32, top: 2),
+                          child: Row(
+                            children: [
+                              Text(isLoanCat ? '🤝' : '›',
+                                  style: TextStyle(fontSize: isLoanCat ? 13 : 16,
+                                      color: Colors.grey.shade500)),
+                              const SizedBox(width: 6),
+                              Expanded(child: Text(s.key,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700))),
+                              Text('$sym ${s.value.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        )),
+                      ],
                       if (pct >= 0.8)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -2370,7 +2568,7 @@ class CategoryManagementScreen extends StatelessWidget {
 
   void _showCategoryDialog(BuildContext context, CategoryModel? existing) {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
-    final icons = ['🍔', '🚗', '🛍️', '💡', '💊', '🎬', '📚', '📦', '✈️', '🏠', '🎮', '💼', '🐾', '⚽', '🎵', '🍕'];
+    final icons = ['🍔', '🚗', '🛍️', '💡', '💊', '🏠', '📚', '📦', '✈️', '🏠', '🎮', '💼', '🐾', '⚽', '🎵', '🍕'];
     final colors = [
       0xFFE53935, 0xFF1E88E5, 0xFF8E24AA, 0xFFFB8C00,
       0xFF00ACC1, 0xFF43A047, 0xFF6D4C41, 0xFF757575,
