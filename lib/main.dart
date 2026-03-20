@@ -194,7 +194,7 @@ const List<String> kBillsSubCategories = [
   'Electricity', 'Gas', 'Wifi', 'Trash', 'Cook', 'Extra',
 ];
 const List<String> kOtherSubCategories = [
-  'House Rent', 'Personal Care', 'Gift', 'Miscellaneous',
+  'Entertainment', 'Personal Care', 'Gift', 'Miscellaneous',
 ];
 
 class SettingsProvider extends ChangeNotifier {
@@ -787,7 +787,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 180,
+            expandedHeight: 290,
             floating: false,
             pinned: true,
             title: const Text(kAppName, style: TextStyle(fontWeight: FontWeight.bold)),
@@ -814,27 +814,74 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 80, 8, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: SummaryCard(
-                          label: 'This Month',
-                          amount: '$sym ${expenses.totalThisMonth.toStringAsFixed(0)}',
-                          icon: Icons.calendar_month,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SummaryCard(
-                          label: 'Today',
-                          amount: '$sym ${expenses.totalToday.toStringAsFixed(0)}',
-                          icon: Icons.today,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(8, 88, 8, 4),
+                  child: Consumer<BudgetProvider>(
+                    builder: (_, budgetProv, __) {
+                      final budget = budgetProv.budget;
+                      final remaining = budget.monthlyTotal > 0
+                          ? budget.monthlyTotal - expenses.totalThisMonth
+                          : null;
+                      final remainingColor = remaining == null
+                          ? Colors.teal
+                          : remaining < 0
+                          ? Colors.red
+                          : remaining == 0
+                          ? Colors.orange
+                          : Colors.teal;
+                      return Column(
+                        children: [
+                          // Row 1: This Month + Today
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SummaryCard(
+                                  label: 'This Month',
+                                  amount: '$sym ${expenses.totalThisMonth.toStringAsFixed(0)}',
+                                  icon: Icons.calendar_month,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SummaryCard(
+                                  label: 'Today',
+                                  amount: '$sym ${expenses.totalToday.toStringAsFixed(0)}',
+                                  icon: Icons.today,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Row 2: Monthly Budget + Remaining (only if budget is set)
+                          if (budget.monthlyTotal > 0 && remaining != null) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SummaryCard(
+                                    label: 'Monthly Budget',
+                                    amount: '$sym ${budget.monthlyTotal.toStringAsFixed(0)}',
+                                    icon: Icons.account_balance_wallet_outlined,
+                                    color: Colors.purple,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SummaryCard(
+                                    label: remaining < 0 ? 'Over Budget' : 'Remaining',
+                                    amount: '$sym ${remaining.abs().toStringAsFixed(0)}',
+                                    icon: remaining < 0
+                                        ? Icons.trending_up
+                                        : Icons.savings_outlined,
+                                    color: remainingColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -2189,18 +2236,28 @@ class BudgetScreen extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(
-                              monthSpent >= budget.monthlyTotal ? Icons.cancel : Icons.warning_amber,
-                              color: monthSpent >= budget.monthlyTotal ? Colors.red : Colors.orange,
+                              monthSpent > budget.monthlyTotal
+                                  ? Icons.cancel
+                                  : monthSpent >= budget.monthlyTotal
+                                  ? Icons.check_circle
+                                  : Icons.warning_amber,
+                              color: monthSpent > budget.monthlyTotal
+                                  ? Colors.red
+                                  : Colors.orange,
                               size: 16,
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              monthSpent >= budget.monthlyTotal
-                                  ? '❌ Budget exceeded!'
-                                  : '⚠️ 80% of budget used',
-                              style: TextStyle(
-                                color: monthSpent >= budget.monthlyTotal ? Colors.red : Colors.orange,
-                                fontWeight: FontWeight.w600,
+                            Expanded(
+                              child: Text(
+                                monthSpent > budget.monthlyTotal
+                                    ? '❌ You are overspending! $sym ${(monthSpent - budget.monthlyTotal).toStringAsFixed(0)} over budget'
+                                    : monthSpent >= budget.monthlyTotal
+                                    ? '✅ You have used all your budget!'
+                                    : '⚠️ 80% of budget used',
+                                style: TextStyle(
+                                  color: monthSpent > budget.monthlyTotal ? Colors.red : Colors.orange,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -2330,18 +2387,30 @@ class BudgetScreen extends StatelessWidget {
                           child: Row(
                             children: [
                               Icon(
-                                pct >= 1 ? Icons.cancel : Icons.warning_amber,
-                                color: pct >= 1 ? Colors.red : Colors.orange,
+                                spent > entry.value
+                                    ? Icons.cancel
+                                    : pct >= 1
+                                    ? Icons.check_circle
+                                    : Icons.warning_amber,
+                                color: spent > entry.value
+                                    ? Colors.red
+                                    : pct >= 1
+                                    ? Colors.orange
+                                    : Colors.orange,
                                 size: 14,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                pct >= 1
-                                    ? 'You are overspending on ${cat?.name}!'
-                                    : 'Almost at budget limit for ${cat?.name}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: pct >= 1 ? Colors.red : Colors.orange,
+                              Expanded(
+                                child: Text(
+                                  spent > entry.value
+                                      ? 'You are overspending on ${cat?.name}! ${sym} ${(spent - entry.value).toStringAsFixed(0)} over budget'
+                                      : pct >= 1
+                                      ? 'You have used all your budget!'
+                                      : 'Almost at budget limit for ${cat?.name}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: spent > entry.value ? Colors.red : Colors.orange,
+                                  ),
                                 ),
                               ),
                             ],
@@ -2392,16 +2461,21 @@ class BudgetScreen extends StatelessWidget {
   }
 
   void _addCategoryBudget(BuildContext context) {
-    final cats = context.read<CategoryProvider>().categories;
+    final cats   = context.read<CategoryProvider>().categories;
     final budget = context.read<BudgetProvider>().budget;
+    final sym    = context.read<SettingsProvider>().currencySymbol;
+
     final available = cats.where((c) => !budget.categoryBudgets.containsKey(c.id)).toList();
     if (available.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All categories have budgets')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All categories have budgets')),
+      );
       return;
     }
+
     String? selectedId = available.first.id;
     final ctrl = TextEditingController();
-    final sym = context.read<SettingsProvider>().currencySymbol;
+
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
@@ -2422,19 +2496,72 @@ class BudgetScreen extends StatelessWidget {
               TextField(
                 controller: ctrl,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: 'Budget amount', prefixText: '$sym '),
+                decoration: InputDecoration(
+                  labelText: 'Budget amount',
+                  prefixText: '$sym ',
+                ),
                 autofocus: true,
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () {
                 final v = double.tryParse(ctrl.text);
-                if (v != null && v > 0 && selectedId != null) {
-                  context.read<BudgetProvider>().setCategoryBudget(selectedId!, v);
+                if (v == null || v <= 0 || selectedId == null) return;
+
+                // Check if adding this would exceed the monthly budget
+                if (budget.monthlyTotal > 0) {
+                  final currentCatTotal = budget.categoryBudgets.values
+                      .fold(0.0, (sum, amt) => sum + amt);
+                  final newTotal = currentCatTotal + v;
+
+                  if (newTotal > budget.monthlyTotal) {
+                    // Close the add dialog first
+                    Navigator.pop(context);
+                    // Show exceed warning dialog
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        icon: const Icon(Icons.warning_amber_rounded,
+                            color: Colors.orange, size: 40),
+                        title: const Text('Budget Exceeded!',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        content: Text(
+                          'Adding $sym ${v.toStringAsFixed(0)} would bring category budgets to '
+                              '$sym ${newTotal.toStringAsFixed(0)}, which exceeds your monthly budget of '
+                              '$sym ${budget.monthlyTotal.toStringAsFixed(0)}.'
+                          'Would you like to reset your monthly budget to fit, or cancel?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel Adding'),
+                          ),
+                          FilledButton.icon(
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Reset Monthly Budget'),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              // Save the category budget first
+                              context.read<BudgetProvider>().setCategoryBudget(selectedId!, v);
+                              // Then open the monthly budget editor
+                              _editMonthlyBudget(context);
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                    return;
+                  }
                 }
+
+                // All good — save normally
+                context.read<BudgetProvider>().setCategoryBudget(selectedId!, v);
                 Navigator.pop(context);
               },
               child: const Text('Save'),
@@ -2485,13 +2612,17 @@ class _BudgetProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = total > 0 ? (spent / total).clamp(0.0, 1.0) : 0.0;
+    // Use raw ratio (unclipped) to detect true overspend
+    final rawRatio = total > 0 ? spent / total : 0.0;
     Color color;
-    if (pct >= 1.0) {
-      color = Colors.red;
-    } else if (pct >= 0.8) {
-      color = Colors.orange;
+    if (rawRatio > 1.0) {
+      color = Colors.red;       // actually over budget
+    } else if (rawRatio >= 1.0) {
+      color = Colors.orange;    // exactly at 100%
+    } else if (rawRatio >= 0.8) {
+      color = Colors.orange;    // 80–99%
     } else {
-      color = Colors.green;
+      color = Colors.green;     // under 80%
     }
 
     return ClipRRect(
@@ -2518,7 +2649,16 @@ class CategoryManagementScreen extends StatelessWidget {
     final categories = context.watch<CategoryProvider>().categories;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
+      appBar: AppBar(
+        title: const Text('Categories'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Add Category',
+            onPressed: () => _addCategory(context),
+          ),
+        ],
+      ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: categories.length,
@@ -2556,10 +2696,7 @@ class CategoryManagementScreen extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _addCategory(context),
-        child: const Icon(Icons.add),
-      ),
+
     );
   }
 
@@ -2568,7 +2705,7 @@ class CategoryManagementScreen extends StatelessWidget {
 
   void _showCategoryDialog(BuildContext context, CategoryModel? existing) {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
-    final icons = ['🍔', '🚗', '🛍️', '💡', '💊', '🏠', '📚', '📦', '✈️', '🏠', '🎮', '💼', '🐾', '⚽', '🎵', '🍕'];
+    final icons = ['🍔', '🚗', '🛍️', '💡', '💊', '🎬', '📚', '📦', '✈️', '🏠', '🎮', '💼', '🐾', '⚽', '🎵', '🍕'];
     final colors = [
       0xFFE53935, 0xFF1E88E5, 0xFF8E24AA, 0xFFFB8C00,
       0xFF00ACC1, 0xFF43A047, 0xFF6D4C41, 0xFF757575,
