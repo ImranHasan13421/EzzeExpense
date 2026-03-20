@@ -1,6 +1,5 @@
 // ============================================================
-//  main.dart — Entry point
-//  EzzeExpense | Provider + Hive + fl_chart
+//  main.dart — Entry point | Dark Vault Theme
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -52,7 +51,9 @@ class EzzeExpenseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = EzzeTheme.of(context);
     final settings = context.watch<SettingsProvider>();
+    // Always dark — theme handles light/dark variants
     return MaterialApp(
       title:                  kAppName,
       debugShowCheckedModeBanner: false,
@@ -66,7 +67,6 @@ class EzzeExpenseApp extends StatelessWidget {
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
-
   @override
   State<MainShell> createState() => _MainShellState();
 }
@@ -83,33 +83,44 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final t = EzzeTheme.of(context);
     return Scaffold(
+      backgroundColor: t.bgBase,
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex:         _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: const [
-          NavigationDestination(
-            icon:         Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label:        'Home',
-          ),
-          NavigationDestination(
-            icon:         Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label:        'Stats',
-          ),
-          NavigationDestination(
-            icon:         Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label:        'Budget',
-          ),
-          NavigationDestination(
-            icon:         Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label:        'Settings',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color:  t.bgBase,
+          border: Border(top: BorderSide(color: t.border, width: 1)),
+        ),
+        child: NavigationBar(
+          selectedIndex:         _currentIndex,
+          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          backgroundColor:       Colors.transparent,
+          surfaceTintColor:      Colors.transparent,
+          shadowColor:           Colors.transparent,
+          destinations: const [
+            NavigationDestination(
+              icon:         Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label:        'Home',
+            ),
+            NavigationDestination(
+              icon:         Icon(Icons.bar_chart_outlined),
+              selectedIcon: Icon(Icons.bar_chart_rounded),
+              label:        'Stats',
+            ),
+            NavigationDestination(
+              icon:         Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+              label:        'Budget',
+            ),
+            NavigationDestination(
+              icon:         Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings_rounded),
+              label:        'Settings',
+            ),
+          ],
+        ),
       ),
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
@@ -118,7 +129,11 @@ class _MainShellState extends State<MainShell> {
                 MaterialPageRoute(
                     builder: (_) => const AddEditExpenseScreen()),
               ),
-              child: const Icon(Icons.add),
+              backgroundColor: kAccent,
+              foregroundColor: t.bgDeep,
+              elevation:       12,
+              tooltip: 'Add Expense',
+              child: const Icon(Icons.add_rounded, size: 26),
             )
           : null,
     );
