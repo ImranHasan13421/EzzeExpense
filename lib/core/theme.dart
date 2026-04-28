@@ -9,9 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // ── Shared accent colours ─────────────────────────────────────
-const Color kAccent      = Color(0xFF00A88A); // main emerald — readable on both
-const Color kAccentLight = Color(0xFF00C9A7); // lighter glow
-const Color kAccentDeep  = Color(0xFF00796B); // deep teal for light bg
+const Color kAccent      = Color(0xFF008FA8); // main emerald — readable on both
+const Color kAccentLight = Color(0xFF00B8C9); // lighter glow
+const Color kAccentDeep  = Color(0xFF006F79); // deep teal for light bg
 
 // ── Semantic colours ──────────────────────────────────────────
 const Color kDanger  = Color(0xFFD32F2F); // red   — strong on both
