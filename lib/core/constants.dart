@@ -1,6 +1,3 @@
-// ============================================================
-//  core/constants.dart — App-wide constants & default data
-// ============================================================
 
 const String kAppName     = 'EzzeExpense';
 const String kExpenseBox  = 'expenses';
