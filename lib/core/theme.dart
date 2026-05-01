@@ -1,9 +1,4 @@
-// ============================================================
-//  core/theme.dart — Fully Adaptive Theme (Light + Dark)
-//  Accent: Oceanic Cobalt #2563EB  |  Balanced radius
-//  Dark:  Midnight Navy, Glowing Azure
-//  Light: Ice Blue, Rich Cobalt accents
-// ============================================================
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
